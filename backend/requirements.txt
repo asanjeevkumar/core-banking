@@ -1,0 +1,4 @@
+Flask&gt;=2.0
+SQLAlchemy&gt;=1.4
+PyJWT&gt;=2.0
+bcrypt&gt;=3.2
