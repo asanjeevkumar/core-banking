@@ -1,0 +1,5 @@
+database_url: postgresql://user:password@localhost:5432/user_db
+jwt_secret_key: your_jwt_secret_key_here
+refresh_token_secret_key: your_refresh_token_secret_key_here
+access_token_expiry: 900  # 15 minutes in seconds
+refresh_token_expiry: 604800 # 7 days in seconds

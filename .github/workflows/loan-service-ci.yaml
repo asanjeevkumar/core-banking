@@ -1,0 +1,58 @@
+name: Loan Service CI
+
+on:
+  push:
+    branches:
+      - main # or your default branch
+    paths:
+      - 'loan-service/**'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9' # Or your desired Python version
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('loan-service/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        pip install -r loan-service/requirements.txt
+        pip install pytest requests-mock
+
+    - name: Run unit tests
+      run: |
+        pytest loan-service/tests/unit
+
+    # Add a step to run integration tests here once implemented
+    - name: Run integration tests
+      run: |
+        pytest loan-service/tests/integration
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+    - name: Build and tag Docker image
+      run: |
+        docker build ./loan-service -t your-dockerhub-username/loan-service:latest
+        docker tag your-dockerhub-username/loan-service:latest your-dockerhub-username/loan-service:${{ github.sha }} # Tag with commit SHA for versioning
+
+    - name: Push Docker image
+      run: |
+        docker push your-dockerhub-username/loan-service:latest
+        docker push your-dockerhub-username/loan-service:${{ github.sha }}

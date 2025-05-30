@@ -1,0 +1,2 @@
+database_url: "sqlite:///collection-service.db"
+loan_service_url: "http://loan-service:5002"

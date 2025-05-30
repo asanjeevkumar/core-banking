@@ -1,0 +1,56 @@
+name: User Service CI
+
+on:
+  push:
+    paths:
+      - 'user-service/**'
+      - '.github/workflows/user-service-ci.yaml' # Also trigger if the workflow file changes
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('user-service/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      working-directory: ./user-service
+      run: |
+        pip install -r requirements.txt
+        pip install pytest requests-mock # Ensure testing dependencies are installed
+
+    - name: Run unit tests
+      working-directory: ./user-service
+      run: pytest tests/unit
+
+    # Integration tests might require a database setup, consider running them separately or with a test database fixture
+    # - name: Run integration tests
+    #   working-directory: ./user-service
+    #   run: pytest tests/integration
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+    - name: Build and tag Docker image
+      working-directory: ./user-service
+      run: docker build -t your-dockerhub-username/user-service:latest .
+
+    - name: Push Docker image
+      run: docker push your-dockerhub-username/user-service:latest

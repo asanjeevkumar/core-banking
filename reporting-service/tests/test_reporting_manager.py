@@ -1,7 +1,5 @@
 import pytest
-from unittest.mock import patch, Mock
-# If you prefer using requests_mock, install it and import here
-# import requests_mock
+import requests_mock
 
 from reporting_service.reporting_manager import ReportingManager
 
@@ -22,18 +20,15 @@ class TestReportingManager:
         return ReportingManager(mock_db_session)
 
     # Example test for generating active loans report, mocking HTTP requests
-    @patch('requests.get')
-    def test_generate_active_loans_report(self, mock_get, reporting_manager):
+    @requests_mock.mock
+    def test_generate_active_loans_report(self, m, reporting_manager):
         # Configure the mock to return a specific response for the Loan Service endpoint
-        mock_loan_service_response = Mock()
-        mock_loan_service_response.status_code = 200
         # Simulate the data structure returned by the Loan Service for active loans
-        mock_loan_service_response.json.return_value = [
+        loan_service_url = 'http://loan-service:5002/loans/active' # Adjust URL as per your implementation
+        m.get(loan_service_url, json=[
             {'id': 1, 'amount': 1000, 'status': 'active', 'borrower_id': 101},
             {'id': 2, 'amount': 2000, 'status': 'active', 'borrower_id': 102},
-        ]
-        # Map the URL to the mock response
-        mock_get.return_value = mock_loan_service_response
+        ], status_code=200)
 
         # Call the method under test
         active_loans = reporting_manager.generate_active_loans_report()
@@ -41,21 +36,18 @@ class TestReportingManager:
         # Assertions to check the report content
         assert isinstance(active_loans, list)
         assert len(active_loans) == 2
-        assert active_loans[0]['status'] == 'active'
-        assert active_loans[1]['status'] == 'active'
+        assert all(loan['status'] == 'active' for loan in active_loans)
 
         # Verify that the correct HTTP request was made
-        mock_get.assert_called_once_with('http://loan-service:5002/loans/active') # Adjust URL as per your implementation
+        assert m.called_once_with(loan_service_url)
 
     # Example test for generating paid-off loans report, mocking HTTP requests
-    @patch('requests.get')
-    def test_generate_paid_off_loans_report(self, mock_get, reporting_manager):
-        mock_loan_service_response = Mock()
-        mock_loan_service_response.status_code = 200
-        mock_loan_service_response.json.return_value = [
+    @requests_mock.mock
+    def test_generate_paid_off_loans_report(self, m, reporting_manager):
+        loan_service_url = 'http://loan-service:5002/loans/paid-off' # Adjust URL as per your implementation
+        m.get(loan_service_url, json=[
             {'id': 3, 'amount': 500, 'status': 'paid_off', 'borrower_id': 103},
-        ]
-        mock_get.return_value = mock_loan_service_response
+        ], status_code=200)
 
         paid_off_loans = reporting_manager.generate_paid_off_loans_report()
 
@@ -63,6 +55,40 @@ class TestReportingManager:
         assert len(paid_off_loans) == 1
         assert paid_off_loans[0]['status'] == 'paid_off'
 
-        mock_get.assert_called_once_with('http://loan-service:5002/loans/paid-off') # Adjust URL as per your implementation
+        assert m.called_once_with(loan_service_url)
+
+    # Add test for generating a report that requires data from both Loan and Collection Services
+    @requests_mock.mock
+    def test_generate_loans_with_repayments_report(self, m, reporting_manager):
+        loan_service_url = 'http://loan-service:5002/loans' # Adjust URL as per your implementation
+        collection_service_url = 'http://collection-service:5003/repayments' # Adjust URL as per your implementation
+
+        m.get(loan_service_url, json=[
+            {'id': 1, 'amount': 1000, 'status': 'active', 'borrower_id': 101},
+            {'id': 2, 'amount': 2000, 'status': 'paid_off', 'borrower_id': 102},
+        ], status_code=200)
+
+        m.get(collection_service_url, json=[
+            {'id': 10, 'loan_id': 1, 'amount': 500, 'payment_date': '2023-01-15'},
+            {'id': 11, 'loan_id': 1, 'amount': 500, 'payment_date': '2023-02-15'},
+            {'id': 12, 'loan_id': 2, 'amount': 2000, 'payment_date': '2022-12-01'},
+        ], status_code=200)
+
+        # Assuming ReportingManager has a method for this report, e.g., generate_loans_with_repayments
+        # This part of the test needs to be adapted based on your ReportingManager implementation
+        # For demonstration, let's assume it fetches all loans and all repayments and combines them
+
+        # Since ReportingManager currently only has generate_active_loans_report and generate_paid_off_loans_report
+        # and doesn't combine data from both services in those methods, this test needs a corresponding method
+        # in ReportingManager or would be testing a different report type.
+
+        # For now, let's just assert the mocks were called as expected
+        # In a real scenario, you would call a reporting_manager method and assert the output
+        # Example: report_data = reporting_manager.generate_loans_with_repayments()
+        # assert ... assertions on report_data ...
+
+        # Assert that the correct HTTP requests were made
+        assert m.called_with(loan_service_url)
+        assert m.called_with(collection_service_url)
 
     # Add more tests for other report types and edge cases (e.g., empty results, errors)

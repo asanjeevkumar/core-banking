@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+      - name: user-service
+        image: your-dockerhub-username/user-service:latest
+        ports:
+        - containerPort: 5001
+        resources:
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+        env:
+          - name: DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: service-secrets
+                key: database_url
+          - name: JWT_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: service-secrets
+                key: jwt_secret_key
+          - name: REFRESH_TOKEN_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: service-secrets
+                key: refresh_token_secret_key
+          # Other environment variables (ConfigMaps or direct values)
+          - name: ACCESS_TOKEN_EXPIRY
+            value: "15m" # Example expiry
+          - name: REFRESH_TOKEN_EXPIRY
+            value: "7d" # Example expiry
+---
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+spec:
+  selector:
+    app: user-service
+  type: ClusterIP
+  ports:
+  - protocol: TCP
+    port: 5001
+    targetPort: 5001

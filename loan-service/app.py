@@ -4,22 +4,40 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 import logging
 import os
 from sqlalchemy.exc import IntegrityError
+from python_json_logger import JsonFormatter
 from models import Base, Loan, Borrower
 from loan_manager import LoanManager
 from borrower_manager import BorrowerManager
 # You might need to import modules for inter-service communication (e.g., requests)
 # if you need to fetch borrower details from the User Service.import requests
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO) # Set logging level
+config = {}
+try:
+ with open(CONFIG_PATH, 'r') as f:
+ config = yaml.safe_load(f)
+except FileNotFoundError:
+ logger.error(f"Configuration file not found at {CONFIG_PATH}")
+except yaml.YAMLError as e:
+ logger.error(f"Error parsing configuration file: {e}")
 
+def get_config_from_consul(key):
+ # Configure logging with JsonFormatter
+ logHandler = logging.StreamHandler()
+ formatter = JsonFormatter()
+ logHandler.setFormatter(formatter)
+ logger.addHandler(logHandler)
+ # Simulate fetching configuration from Consul's K/V store
+ # In a real application, you would use a Consul client library here
+ # For now, we return hardcoded values or environment variables
+ if key == 'database_url':
+ return os.environ.get('DATABASE_URL', 'sqlite:////app/loan-service.db')
+ elif key == 'user_service_url':
+ return os.environ.get('USER_SERVICE_URL', 'http://user-service:5001')
+ return None
 
-
-DATABASE_URL = 'sqlite:///./loan_service.db'
-DATABASE_URL = os.environ.get('DATABASE_URL', DATABASE_URL)
 app = Flask(__name__)
-
 engine = create_engine(DATABASE_URL)
 Base.metadata.bind = engine
 

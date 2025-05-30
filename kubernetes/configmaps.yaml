@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-config
+data:
+  user_service_url: http://user-service:5001
+  loan_service_url: http://loan-service:5002
+  collection_service_url: http://collection-service:5003
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-config
+data:
+  user_service_url: http://user-service:5001
+  loan_service_url: http://loan-service:5002
+  collection_service_url: http://collection-service:5003

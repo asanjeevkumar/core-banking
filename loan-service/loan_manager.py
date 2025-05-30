@@ -1,9 +1,15 @@
 # loan_manager.py
 
 from datetime import date
+import os
 from sqlalchemy.orm import Session
 from .models import Loan, Borrower
 import requests # Import the requests library
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+# Load configuration from environment variables or a config service
+# In a real application, use a config service or centralized config management
+USER_SERVICE_URL = os.environ.get('USER_SERVICE_URL', 'http://localhost:5001') # Default for local development
 
 # In a real application, this would interact with a database
 class LoanManager:
@@ -19,19 +25,21 @@ class LoanManager:
             raise ValueError("Interest rate must be a non-negative number.")
         if not isinstance(start_date, date):
             raise ValueError("Start date must be a valid date object.")
+        if not borrower_data:
+            raise ValueError("Borrower data is required.")
 
         # --- Inter-Service Communication: Interact with User Service to get or create borrower ---
-        user_service_url = 'http://localhost:5001' # Replace with actual User Service URL
         borrower_id = borrower_data.get('id') # Assuming borrower_data might contain an existing ID
 
         borrower = None
         if borrower_id:
             try:
-                response = requests.get(f'{user_service_url}/users/{borrower_id}')
+                @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+                def fetch_borrower_from_user_service(borrower_id):
+                    response = requests.get(f'{USER_SERVICE_URL}/users/{borrower_id}', timeout=5) # Set a timeout
+ return response
+                response = fetch_borrower_from_user_service(borrower_id)
                 response.raise_for_status() # Raise an exception for bad status codes
-                borrower_data_from_service = response.json()
-                # You would likely need to create a Borrower object from this data if not using a shared model
-                # For simplicity, we'll assume the response structure matches our needs or we get enough info
             except requests.exceptions.RequestException as e:
             borrower = self.borrower_manager.create_borrower(borrower_data.get('name'), borrower_data.get('contact_info'), borrower_data.get('credit_score'))
 

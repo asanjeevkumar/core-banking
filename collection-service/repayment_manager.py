@@ -2,6 +2,7 @@ from models import Loan  # Import the Loan model from models.py
 from sqlalchemy.orm import Session # Import Session for type hinting
 
 import requests
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 class RepaymentManager:
     def process_repayment(self, db: Session, loan_id: int, payment_amount: float):
@@ -16,12 +17,18 @@ class RepaymentManager:
         Returns:
             True if the repayment was processed successfully, False otherwise.
         """
+        # Retry and timeout configuration for communicating with the Loan Service
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+        def get_loan_details(loan_id):
+            loan_service_url = 'http://loan-service:5002' # Replace with the actual Loan Service URL
+            response = requests.get(f"{loan_service_url}/loans/{loan_id}", timeout=5) # Set a timeout
+            response.raise_for_status()
+            return response.json()
+
         # Communicate with the Loan Service to get loan details
-        loan_service_url = 'http://loan-service:5002' # Replace with the actual Loan Service URL
         try:
-            response = requests.get(f"{loan_service_url}/loans/{loan_id}")
-            response.raise_for_status() # Raise an exception for bad status codes
-            loan_data = response.json()
+            loan_data = get_loan_details(loan_id)
+
         except requests.exceptions.RequestException as e:
             print(f"Error communicating with Loan Service: {e}")
             return False
@@ -52,6 +59,12 @@ class RepaymentManager:
         # print(f"Principal portion: {principal_paid:.2f}")
         # print(f"Remaining balance: {loan.outstanding_balance:.2f}")
 
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+        def update_loan_details(loan_id, updated_data):
+            loan_service_url = 'http://loan-service:5002' # Replace with the actual Loan Service URL
+            response = requests.put(f"{loan_service_url}/loans/{loan_id}", json=updated_data, timeout=5) # Set a timeout
+            response.raise_for_status()
+
         updated_loan_data = {
             "outstanding_balance": loan.outstanding_balance,
             "status": loan.status # Need to update status based on outstanding_balance
@@ -63,8 +76,7 @@ class RepaymentManager:
 
         # Communicate with the Loan Service to update loan details
         try:
-            response = requests.put(f"{loan_service_url}/loans/{loan_id}", json=updated_loan_data)
-            response.raise_for_status() # Raise an exception for bad status codes
+            update_loan_details(loan_id, updated_loan_data)
         except requests.exceptions.RequestException as e:
             print(f"Error communicating with Loan Service to update loan: {e}")
             return False

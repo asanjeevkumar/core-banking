@@ -1,0 +1,2 @@
+database_url: "sqlite:///loan-service.db"
+user_service_url: "http://user-service:5001"

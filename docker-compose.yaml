@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+ user-service:
+ build:
+ context: ./user-service
+ ports:
+      - "5001:5001"
+ environment:
+ DATABASE_URL: sqlite:////app/user-service.db
+ networks:
+      - microservice-network
+
+  loan-service:
+ build:
+ context: ./loan-service
+ ports:
+      - "5002:5002"
+ environment:
+ DATABASE_URL: sqlite:////app/loan-service.db
+ depends_on:
+      - user-service # Loan service might interact with user service
+ networks:
+      - microservice-network
+
+  collection-service:
+ build:
+ context: ./collection-service
+ ports:
+      - "5003:5003"
+ environment:
+ DATABASE_URL: sqlite:////app/collection-service.db
+ depends_on:
+      - loan-service
+ networks:
+      - microservice-network
+
+  reporting-service:
+ build:
+ context: ./reporting-service
+ ports:
+      - "5004:5004"
+ environment:
+ DATABASE_URL: sqlite:////app/reporting-service.db
+ depends_on:
+      - loan-service
+      - collection-service
+ networks:
+      - microservice-network
+
+networks:
+ microservice-network:
+ driver: bridge
+version: '3.8'
+
+services:
+  user-service:
+    volumes:
+      - user-service-db:/app
+
+    build:
+      context: ./user-service
+    ports:
+      - "5001:5001"
+    environment:
+      DATABASE_URL: sqlite:////app/user-service.db
+    networks:
+      - microservice-network
+
+  loan-service:
+    volumes:
+      - loan-service-db:/app
+
+    build:
+      context: ./loan-service
+    ports:
+      - "5002:5002"
+    environment:
+      DATABASE_URL: sqlite:////app/loan-service.db
+    depends_on:
+      - user-service # Loan service might interact with user service
+    networks:
+      - microservice-network
+
+  collection-service:
+    volumes:
+      - collection-service-db:/app
+
+    build:
+      context: ./collection-service
+    ports:
+      - "5003:5003"
+    environment:
+      DATABASE_URL: sqlite:////app/collection-service.db
+    depends_on:
+      - loan-service
+    networks:
+      - microservice-network
+
+volumes:
+  user-service-db:
+  loan-service-db:
+  reporting-service:
+    build:
+      context: ./reporting-service
+    ports:
+      - "5004:5004"
+    environment:
+      DATABASE_URL: sqlite:////app/reporting-service.db
+    depends_on:
+      - loan-service
+      - collection-service
+    networks:
+      - microservice-network
+
+  collection-service-db:
+  reporting-service-db:
+networks:
+  microservice-network:
+    driver: bridge

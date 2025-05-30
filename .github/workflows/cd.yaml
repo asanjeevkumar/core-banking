@@ -1,0 +1,80 @@
+name: Continuous Deployment
+
+on:
+  # Trigger on successful completion of the CI workflows
+  workflow_run:
+    workflows: ["User Service CI", "Loan Service CI", "Collection Service CI", "Reporting Service CI"]
+    types:
+      - completed
+    # Only run CD if the CI workflow succeeded
+    branches:
+      - main # Or your main development branch
+
+  # Alternatively, trigger on tag pushes for releasing specific versions
+  # push:
+  #   tags:
+  #     - 'v*' # Trigger on tags like v1.0, v1.1, etc.
+
+jobs:
+  deploy-to-kubernetes:
+    # Use an environment suitable for deployment.
+    # This might require self-hosted runners with access to your Kubernetes cluster
+    # or using specific cloud provider runners and configuring access.
+    runs-on: ubuntu-latest # Example runner, replace with your deployment environment runner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Set up Kubernetes credentials
+      # This step is crucial and depends heavily on your Kubernetes cluster provider and configuration.
+      # You might need to:
+      # - Install kubectl (often pre-installed on runners)
+      # - Configure kubeconfig using secrets
+      # - Authenticate with your cloud provider to get cluster access
+      - name: Set up Kubernetes credentials
+        run: |
+          # Example: Configure kubectl using a kubeconfig stored as a GitHub Secret
+          # mkdir -p ~/.kube
+          # echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+          # Example: Login to cloud provider and get cluster credentials
+          # aws eks update-kubeconfig --region <your-region> --name <your-cluster-name>
+          echo "Replace this with your actual Kubernetes credentials setup steps."
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG }} # Example using KUBECONFIG secret
+
+      # Optional: Update image tags in Kubernetes manifests
+      # This step replaces the :latest tag with the specific image tag from the CI build.
+      # You'll need to get the image tag from the workflow_run event or a tag push.
+      # The example below is conceptual and needs to be adapted based on how you get the image tag.
+      # Consider using tools like `kustomize` or `helm` for managing Kubernetes manifests.
+      - name: Update image tags
+        run: |
+          # Example: Replace 'latest' tag with a specific tag (e.g., based on commit SHA)
+          # IMAGE_TAG="your-image-tag" # Get this from a previous step or context
+          # sed -i "s/:latest/:${IMAGE_TAG}/g" kubernetes/*.yaml
+          echo "Replace this with logic to update image tags in your manifests."
+
+      - name: Apply Kubernetes manifests
+        run: kubectl apply -f kubernetes/
+
+      # Wait for deployment rollout to complete
+      - name: Wait for user-service rollout
+        run: kubectl rollout status deployment/user-service --timeout=5m
+      - name: Wait for loan-service rollout
+        run: kubectl rollout status deployment/loan-service --timeout=5m
+      - name: Wait for collection-service rollout
+        run: kubectl rollout status deployment/collection-service --timeout=5m
+      - name: Wait for reporting-service rollout
+        run: kubectl rollout status deployment/reporting-service --timeout=5m
+
+      # Run end-to-end tests
+      # Implement steps to run your end-to-end tests against the deployed services.
+      - name: Run end-to-end tests
+        run: |
+          echo "Replace this with your end-to-end test execution command."
+          # Example: Run tests using pytest
+          # pytest path/to/your/end_to_end_tests
+
+      # Add steps for monitoring, health checks, or rollback if needed
+      # ...
