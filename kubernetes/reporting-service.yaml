@@ -24,24 +24,6 @@ spec:
           requests:
             cpu: "250m"
             memory: "128Mi"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 5004
-          initialDelaySeconds: 15
-          periodSeconds: 20
-          timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 5004
-          initialDelaySeconds: 5
-          periodSeconds: 10
-          timeoutSeconds: 3
-          successThreshold: 1
-          failureThreshold: 3
         env:
         - name: LOAN_SERVICE_URL
           valueFrom:

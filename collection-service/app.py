@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import logging
 import os
+from flasgger import Swagger
 from sqlalchemy.ext.declarative import declarative_base
 from repayment_manager import RepaymentManager
 
@@ -36,6 +37,7 @@ Base = declarative_base() # Define Base for this service - important if this ser
 engine = create_engine(DATABASE_URL)
 
 app = Flask(__name__)
+Swagger(app)
 
 # Initialize database - create tables for models defined in this service
 def init_db():
@@ -48,8 +50,55 @@ db_session = orm.scoped_session(SessionLocal)
 logger.setLevel(logging.INFO)
 
 # Endpoint for processing repayments
+# Endpoint for processing repayments
 @app.route('/loans/<int:loan_id>/repay', methods=['POST'])
 def process_repayment(loan_id):
+    """
+    Process a repayment for a specific loan.
+    ---
+    parameters:
+      - name: loan_id
+        in: path
+        type: integer
+        required: true
+        description: The ID of the loan to repay.
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            payment_amount:
+              type: number
+              format: float
+              description: The amount of the repayment.
+    responses:
+      200:
+        description: Repayment processed successfully.
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              description: A success message.
+      400:
+        description: Invalid request or failed to process repayment.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              description: An error message.
+      500:
+        description: Internal server error.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              description: An error message.
+    """
+    try:
         data = request.get_json()
         payment_amount = data.get('payment_amount')
 
@@ -68,6 +117,18 @@ def process_repayment(loan_id):
     except Exception as e:
         logger.error(f"Error processing repayment for loan {loan_id}: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+ """
+ Health check endpoint.
+ ---
+ responses:
+ 200:
+ description: Collection Service is healthy.
+ """
+ # Basic health check - could add database connection check or Loan Service connectivity check
+ return jsonify({"status": "UP"}), 200
 
 if __name__ == '__main__':
     init_db() # Initialize the database for this service

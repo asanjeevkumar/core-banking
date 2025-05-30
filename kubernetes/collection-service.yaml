@@ -29,15 +29,15 @@ spec:
           valueFrom:
             secretKeyRef:
               name: service-secrets
-              key: database_url
-        livenessProbe:
+              key: database_url_collection
+        livenessProbe: # Add Liveness Probe
           httpGet:
             path: /health
             port: 5003
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 5
-        readinessProbe:
+        readinessProbe: # Add Readiness Probe
           httpGet:
             path: /health
             port: 5003

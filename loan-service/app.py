@@ -6,14 +6,17 @@ import os
 from sqlalchemy.exc import IntegrityError
 from python_json_logger import JsonFormatter
 from models import Base, Loan, Borrower
+from flasgger import Swagger
 from loan_manager import LoanManager
 from borrower_manager import BorrowerManager
 # You might need to import modules for inter-service communication (e.g., requests)
-# if you need to fetch borrower details from the User Service.import requests
+# if you need to fetch borrower details from the User Service.
+import requests
+import yaml # Import yaml for configuration loading (if still used)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO) # Set logging level
-config = {}
+
 try:
  with open(CONFIG_PATH, 'r') as f:
  config = yaml.safe_load(f)
@@ -38,6 +41,7 @@ def get_config_from_consul(key):
  return None
 
 app = Flask(__name__)
+swagger = Swagger(app) # Initialize Flasgger
 engine = create_engine(DATABASE_URL)
 Base.metadata.bind = engine
 
@@ -60,7 +64,37 @@ def index():
     return 'Loan Service Running'
 
 @app.route('/loans', methods=['GET'])
+@app.route('/health', methods=['GET'])
+def health_check():
+    """
+    Health Check
+    This endpoint is used to check the health and readiness of the Loan Service.
+    ---
+    responses:
+      200:
+        description: Loan Service is healthy.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string"""
 def get_all_loans():
+    """
+    Get all loans.
+    This endpoint retrieves a list of all loans in the system.
+    ---
+    responses:
+      200:
+        description: A list of loans.
+        schema:
+          type: array
+          items:
+            $ref: '#/definitions/Loan'
+      500:
+        description: Internal server error.
+    """
+    logger.info("Loan Service: Get all loans endpoint accessed")
+
     loan_manager = LoanManager(db_session)
     loans = loan_manager.get_all_loans()
     # Convert Loan objects to dictionaries for JSON serialization
@@ -79,6 +113,26 @@ def get_all_loans():
 
 @app.route('/loans/<int:loan_id>', methods=['GET'])
 def get_loan(loan_id):
+    """
+    Get a loan by ID.
+    This endpoint retrieves a specific loan by its ID.
+    ---
+    parameters:
+      - name: loan_id
+        in: path
+        type: integer
+        required: true
+        description: The ID of the loan to retrieve.
+    responses:
+      200:
+        description: The loan details.
+        schema:
+          $ref: '#/definitions/Loan'
+      404:
+        description: Loan not found.
+      500:
+        description: Internal server error.
+    """
     loan_manager = LoanManager(db_session)
     loan = loan_manager.get_loan(loan_id)
     if loan:
@@ -97,6 +151,34 @@ def get_loan(loan_id):
 
 @app.route('/loans', methods=['POST'])
 def create_loan():
+    """
+    Create a new loan.
+    This endpoint creates a new loan record.
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            borrower_id:
+              type: integer
+              description: The ID of the borrower.
+            amount:
+              type: number
+              format: float
+              description: The loan amount.
+            interest_rate:
+              type: number
+              format: float
+              description: The annual interest rate.
+            term:
+              type: integer
+              description: The loan term in months.
+            start_date:
+              type: string
+              format: date"""
     data = request.json
     if not data:
         return jsonify({'message': 'Invalid input'}), 400

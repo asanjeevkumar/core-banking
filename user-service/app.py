@@ -13,6 +13,7 @@ import os # Import os to potentially read from environment variables
 from uuid import uuid4
 
 from models import Base, User, RefreshToken
+from flasgger import Swagger
 from user_manager import UserManager
 
 from prometheus_client import Counter, generate_latest, REGISTRY
@@ -44,14 +45,14 @@ try:
     app.config['jwt_secret_key'] = get_config_from_consul('jwt_secret_key')
     # Using a different key for refresh token secret as per previous logic
     app.config['refresh_token_secret_key'] = get_config_from_consul('refresh_token_secret_key')
-    app.config['access_token_expiry'] = get_config_from_consul('access_token_expiry')
-    app.config['refresh_token_expiry'] = get_config_from_consul('refresh_token_expiry')
-
-    print(f"Error: Configuration file not found at {config_file_path}")
+    app.config['access_token_expiry'] = get_config_from_consul('access_token_expiry') # type: ignore
+    app.config['refresh_token_expiry'] = get_config_from_consul('refresh_token_expiry') # type: ignore
     exit(1) # Exit if config file is missing
 except yaml.YAMLError as e:
     print(f"Error parsing configuration file: {e}")
     exit(1) # Exit if config file is invalid
+
+Swagger(app) # Initialize Flasgger
 
 
 # Configure logging with JSON formatter
@@ -143,6 +144,41 @@ def require_permission(permission):
 
 @app.route('/register', methods=['POST'])
 def register_user():
+    """
+    Register a new user.
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - username
+            - password
+          properties:
+            username:
+              type: string
+              description: The username for the new user.
+            password:
+              type: string
+              description: The password for the new user.
+            role:
+              type: string
+              description: The role of the user (optional, default is 'user').
+            permissions:
+              type: string
+              description: Comma-separated list of permissions (optional).
+    responses:
+      201:
+        description: User created successfully.
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+      400:
+        description: Username or password missing.
     logger.info("Attempting to register a new user")
     REQUEST_COUNT.inc() # Increment request counter
     data = request.get_json()
@@ -169,6 +205,35 @@ def register_user():
 
 @app.route('/login', methods=['POST'])
 def login_user():
+    """
+    Authenticate a user and generate access and refresh tokens.
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - username
+            - password
+          properties:
+            username:
+              type: string
+            password:
+              type: string
+    responses:
+      200:
+        description: Authentication successful. Returns access and refresh tokens.
+        schema:
+          type: object
+          properties:
+            access_token:
+              type: string
+            refresh_token:
+              type: string
+      401:
+        description: Invalid credentials.
     REQUEST_COUNT.inc() # Increment request counter
     data = request.get_json()
     username = data.get('username')
@@ -220,10 +285,44 @@ def login_user():
         logger.warning(f"Login failed for username: {username}. Invalid credentials.")
         return jsonify({'message': 'Invalid credentials'}), 401
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    """
+    Perform a health check of the User Service.
+    ---
+    responses:
+      200:
+        description: Service is healthy.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+      500:
+        description: Service is unhealthy.
+    """
+    # Basic health check: Check if the database session can be created
+    return jsonify({"status": "UP"}), 200
+
 # Prometheus metrics endpoint
 @app.route('/metrics')
 def metrics():
     return generate_latest(REGISTRY).decode('utf-8'), 200, {'Content-Type': 'text/plain; version=0.0.4; charset=utf-8'}
+
+@app.route('/refresh', methods=['POST'])
+def refresh_token():
+    """
+    Refresh an access token using a refresh token.
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            refresh_token:
+              type: string
 
 
 
@@ -234,6 +333,25 @@ def metrics():
 @app.route('/users', methods=['GET'])
 @require_token
 @require_permission('user:read') # Or 'user:manage' depending on your permission model
+    """
+    Get a list of all users. Requires authentication and 'user:read' permission.
+    ---
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: A list of users.
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              username:
+                type: string
+              role:
+                type: string
 @REQUEST_COUNT.inc() # Increment request counter
 def get_all_users():
     user_manager = UserManager(g.db_session)
@@ -245,6 +363,25 @@ def get_all_users():
 @app.route('/users/<uuid:user_id>', methods=['GET'])
 @require_token
 @require_permission('user:read') # Or 'user:manage'
+    """
+    Get a user by their ID. Requires authentication and 'user:read' permission.
+    ---
+    parameters:
+      - name: user_id
+        in: path
+        type: string
+        required: true
+        description: The UUID of the user to retrieve.
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: The user details.
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
 @REQUEST_COUNT.inc() # Increment request counter
 def get_user(user_id):
     user_manager = UserManager(g.db_session)
@@ -259,6 +396,20 @@ def get_user(user_id):
 @app.route('/users/<uuid:user_id>', methods=['DELETE'])
 @require_token
 @require_permission('user:manage')
+    """
+    Delete a user by their ID. Requires authentication and 'user:manage' permission.
+    ---
+    parameters:
+      - name: user_id
+        in: path
+        type: string
+        required: true
+        description: The UUID of the user to delete.
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: User deleted successfully.
 @REQUEST_COUNT.inc() # Increment request counter
 def delete_user(user_id):
     # Placeholder for delete logic

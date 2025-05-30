@@ -35,19 +35,6 @@ spec:
             configMapKeyRef:
               name: service-config
               key: user_service_url
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 5002
-          initialDelaySeconds: 15
-          periodSeconds: 20
-          timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 5002
           initialDelaySeconds: 5
           periodSeconds: 10
           timeoutSeconds: 3

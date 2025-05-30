@@ -1,6 +1,7 @@
-from flask import Flask
-from reporting_manager import ReportingManager
+from flask import Flask, jsonify
+from reporting_manager import ReportingManager, LoanServiceError, CollectionServiceError
 import logging
+from flasgger import Swagger
 import os
 
 from python_json_logger import JsonFormatter
@@ -29,6 +30,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine) # Us
 db_session = scoped_session(SessionLocal)
 
 app = Flask(__name__)
+Swagger(app) # Initialize Swagger
 
 # Configure logging
 formatter = JsonFormatter('%(asctime)s %(name)s %(levelname)s %(message)s %(pathname)s %(lineno)d')
@@ -52,6 +54,44 @@ def index():
     logger.addHandler(logHandler)
     logger.info("Reporting Service index endpoint accessed.")
     return 'Reporting Service'
+
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """
+    Health check endpoint for the Reporting Service.
+    ---
+    responses:
+      200:
+        description: Service is healthy.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+      500:
+        description: Service is unhealthy.
+    """
+    try:
+        # Add more comprehensive health checks here, e.g., database connection,
+        # attempt basic calls to Loan and Collection services.
+        # ReportingManager.check_dependencies() # Example of calling a manager method for dependency checks
+        return jsonify({"status": "UP"}), 200
+    except (LoanServiceError, CollectionServiceError, Exception) as e:
+        logger.addHandler(logHandler)
+        logger.error(f"Health check failed: {e}")
+        return jsonify({"status": "DOWN", "error": str(e)}), 500
+
+@app.route('/reports/active-loans', methods=['GET'])
+def get_active_loans_report():
+    """
+    Get a report of active loans.
+    ---
+    responses:
+      200:
+        description: A list of active loans.
+    """
+    return ReportingManager.get_active_loans_report()
 
 
 if __name__ == '__main__':

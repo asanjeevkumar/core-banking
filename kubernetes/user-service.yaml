@@ -43,9 +43,8 @@ spec:
           # Other environment variables (ConfigMaps or direct values)
           - name: ACCESS_TOKEN_EXPIRY
             value: "15m" # Example expiry
-          - name: REFRESH_TOKEN_EXPIRY
-            value: "7d" # Example expiry
----
+          - name: REFRESH_TOKEN_EXPIRY # Example expiry
+            value: "7d"
         livenessProbe:
           httpGet:
             path: /health
@@ -58,11 +57,10 @@ spec:
           httpGet:
             path: /health
             port: 5001
-          initialDelaySeconds: 5
-          periodSeconds: 10
-          timeoutSeconds: 3
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
           failureThreshold: 3
----
 
 apiVersion: v1
 kind: Service
